@@ -1,0 +1,169 @@
+groups:
+  - name: marketplace-latency-recording
+    interval: 30s
+    rules:
+      - record: marketplace:http_server_request_duration_seconds:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, application, method, uri) (
+              rate(http_server_requests_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:http_server_request_duration_seconds:p99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, application, method, uri) (
+              rate(http_server_requests_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:inventory_reservation_duration_seconds:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, application, outcome) (
+              rate(marketplace_inventory_reservation_duration_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:inventory_reservation_duration_seconds:p99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, application, outcome) (
+              rate(marketplace_inventory_reservation_duration_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:catalog_cache_load_duration_seconds:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, application, result) (
+              rate(marketplace_catalog_cache_load_duration_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:catalog_cache_load_duration_seconds:p99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, application, result) (
+              rate(marketplace_catalog_cache_load_duration_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:http_client_request_duration_seconds:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, application, method) (
+              rate(http_client_requests_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:http_client_request_duration_seconds:p99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, application, method) (
+              rate(http_client_requests_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:kafka_listener_duration_seconds:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, application, name, result) (
+              rate(spring_kafka_listener_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:kafka_listener_duration_seconds:p99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, application, name, result) (
+              rate(spring_kafka_listener_seconds_bucket[5m])
+            )
+          )
+      - record: marketplace:order_saga_duration_seconds:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, application, terminal_state) (
+              rate(marketplace_order_saga_duration_seconds_bucket[15m])
+            )
+          )
+      - record: marketplace:order_saga_duration_seconds:p99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, application, terminal_state) (
+              rate(marketplace_order_saga_duration_seconds_bucket[15m])
+            )
+          )
+      - record: marketplace:catalog_cache_hit_ratio:5m
+        expr: |
+          sum(rate(marketplace_catalog_cache_requests_total{result=~"hit|hit-after-wait|negative-hit"}[5m]))
+          /
+          clamp_min(sum(rate(marketplace_catalog_cache_requests_total[5m])), 0.001)
+      - record: marketplace:inventory_contention_ratio:5m
+        expr: |
+          sum(rate(marketplace_inventory_reservation_attempts_total{outcome="contention"}[5m]))
+          /
+          clamp_min(sum(rate(marketplace_inventory_reservation_attempts_total[5m])), 0.001)
+
+  - name: marketplace-latency-alerts
+    rules:
+      - alert: MarketplaceHttpP95LatencyHigh
+        expr: marketplace:http_server_request_duration_seconds:p95 > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Marketplace p95 latency is above 500 ms"
+          description: "{{ $labels.application }} {{ $labels.method }} {{ $labels.uri }} p95 is {{ $value }} seconds."
+      - alert: MarketplaceHttpP99LatencyCritical
+        expr: marketplace:http_server_request_duration_seconds:p99 > 1.0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Marketplace p99 latency is above 1 second"
+          description: "{{ $labels.application }} {{ $labels.method }} {{ $labels.uri }} p99 is {{ $value }} seconds."
+      - alert: MarketplaceOrderSagaP99LatencyHigh
+        expr: marketplace:order_saga_duration_seconds:p99 > 60
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Checkout Saga p99 exceeds 60 seconds"
+          description: "{{ $labels.terminal_state }} checkout Saga p99 is {{ $value }} seconds."
+      - alert: MarketplaceKafkaListenerP99LatencyHigh
+        expr: marketplace:kafka_listener_duration_seconds:p99 > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka listener p99 exceeds 2 seconds"
+          description: "{{ $labels.application }} {{ $labels.name }} {{ $labels.result }} listener p99 is {{ $value }} seconds."
+      - alert: InventoryHotSkuContentionHigh
+        expr: marketplace:inventory_contention_ratio:5m > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inventory hot-SKU contention exceeds 5%"
+          description: "Striped buckets are saturated or transactions are too long; contention ratio is {{ $value }}."
+      - alert: CatalogCacheHitRatioLow
+        expr: marketplace:catalog_cache_hit_ratio:5m < 0.80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Catalog cache hit ratio is below 80%"
+          description: "Popular product traffic may be reaching PostgreSQL; hit ratio is {{ $value }}."
+      - alert: CatalogCacheStampedeDetected
+        expr: sum(rate(marketplace_catalog_cache_lock_contention_total[5m])) > 25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Catalog single-flight lock contention is elevated"
+          description: "More than 25 cache-fill collisions per second are occurring."

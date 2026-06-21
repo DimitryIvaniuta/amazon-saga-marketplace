@@ -1,0 +1,301 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "max by (application) (marketplace:http_server_request_duration_seconds:p95)",
+          "legendFormat": "{{application}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "max by (application) (marketplace:http_server_request_duration_seconds:p99)",
+          "legendFormat": "{{application}} p99",
+          "refId": "B"
+        }
+      ],
+      "title": "HTTP p95 / p99 by service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "marketplace:inventory_reservation_duration_seconds:p95",
+          "legendFormat": "{{outcome}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "marketplace:inventory_reservation_duration_seconds:p99",
+          "legendFormat": "{{outcome}} p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Inventory reservation p95 / p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "marketplace:catalog_cache_hit_ratio:5m",
+          "legendFormat": "cache hit ratio",
+          "refId": "A"
+        }
+      ],
+      "title": "Catalog two-tier cache hit ratio",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "marketplace:inventory_contention_ratio:5m",
+          "legendFormat": "contention ratio",
+          "refId": "A"
+        }
+      ],
+      "title": "Hot-SKU contention ratio",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "marketplace:catalog_cache_load_duration_seconds:p95",
+          "legendFormat": "{{result}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "marketplace:catalog_cache_load_duration_seconds:p99",
+          "legendFormat": "{{result}} p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Catalog database fallback p95 / p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "marketplace:http_client_request_duration_seconds:p95",
+          "legendFormat": "{{application}} {{method}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "marketplace:http_client_request_duration_seconds:p99",
+          "legendFormat": "{{application}} {{method}} p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Outbound HTTP p95 / p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "marketplace:order_saga_duration_seconds:p95",
+          "legendFormat": "{{terminal_state}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "marketplace:order_saga_duration_seconds:p99",
+          "legendFormat": "{{terminal_state}} p99",
+          "refId": "B"
+        }
+      ],
+      "title": "End-to-end checkout Saga p95 / p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "marketplace:kafka_listener_duration_seconds:p95",
+          "legendFormat": "{{application}} {{name}} {{result}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "marketplace:kafka_listener_duration_seconds:p99",
+          "legendFormat": "{{application}} {{name}} {{result}} p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Kafka listener p95 / p99",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": [
+    "marketplace",
+    "p95",
+    "p99",
+    "hot-product"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Marketplace Latency and Hot Products",
+  "uid": "marketplace-latency-hot-products",
+  "version": 2
+}
