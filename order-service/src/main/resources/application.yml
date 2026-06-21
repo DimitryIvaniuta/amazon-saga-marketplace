@@ -1,0 +1,77 @@
+server:
+  port: ${SERVER_PORT:8085}
+  shutdown: graceful
+spring:
+  application:
+    name: order-service
+  lifecycle:
+    timeout-per-shutdown-phase: 45s
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 45s
+  r2dbc:
+    url: ${R2DBC_URL:r2dbc:postgresql://localhost:5432/order_db}
+    username: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+    pool:
+      initial-size: 2
+      max-size: 30
+      max-acquire-time: 5s
+  flyway:
+    url: ${FLYWAY_URL:jdbc:postgresql://localhost:5432/order_db}
+    user: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:http://localhost:8081}
+          jwk-set-uri: ${AUTH_JWK_SET_URI:http://localhost:8081/oauth2/jwks}
+          audiences:
+            - ${JWT_AUDIENCE:marketplace-api}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+      immediate-stop: false
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      minimum-expected-value:
+        marketplace.order.saga.duration: 100ms
+      maximum-expected-value:
+        marketplace.order.saga.duration: 10m
+      slo:
+        marketplace.order.saga.duration: 1s,5s,10s,30s,60s,120s,300s,600s
+marketplace:
+  downstream:
+    cart-base-url: ${CART_SERVICE_URL:http://localhost:8083}
+    catalog-base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+    timeout: 3s
+  outbox:
+    enabled: true
+    poll-delay: 250ms
+logging:
+  structured:
+    format:
+      console: logstash
