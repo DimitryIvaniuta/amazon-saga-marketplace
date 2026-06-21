@@ -1,0 +1,66 @@
+server:
+  port: ${SERVER_PORT:8084}
+  shutdown: graceful
+spring:
+  application:
+    name: inventory-service
+  lifecycle:
+    timeout-per-shutdown-phase: 45s
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 45s
+  r2dbc:
+    url: ${R2DBC_URL:r2dbc:postgresql://localhost:5432/inventory_db}
+    username: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+    pool:
+      initial-size: 2
+      max-size: 30
+      max-acquire-time: ${INVENTORY_DB_ACQUIRE_TIMEOUT:1s}
+  flyway:
+    url: ${FLYWAY_URL:jdbc:postgresql://localhost:5432/inventory_db}
+    user: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:http://localhost:8081}
+          jwk-set-uri: ${AUTH_JWK_SET_URI:http://localhost:8081/oauth2/jwks}
+          audiences:
+            - ${JWT_AUDIENCE:marketplace-api}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+      immediate-stop: false
+      concurrency: ${INVENTORY_KAFKA_CONCURRENCY:6}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+marketplace:
+  outbox:
+    enabled: true
+    poll-delay: 250ms
+logging:
+  structured:
+    format:
+      console: logstash
