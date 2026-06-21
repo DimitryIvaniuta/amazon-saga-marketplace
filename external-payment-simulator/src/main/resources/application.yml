@@ -1,0 +1,19 @@
+server:
+  port: ${SERVER_PORT:8090}
+  shutdown: graceful
+spring:
+  application.name: external-payment-simulator
+  lifecycle.timeout-per-shutdown-phase: 30s
+  r2dbc:
+    url: ${R2DBC_URL:r2dbc:postgresql://localhost:5432/provider_db}
+    username: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+    pool: { initial-size: 1, max-size: 15, max-acquire-time: 5s }
+  flyway:
+    url: ${FLYWAY_URL:jdbc:postgresql://localhost:5432/provider_db}
+    user: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health.probes.enabled: true
+logging.structured.format.console: logstash
