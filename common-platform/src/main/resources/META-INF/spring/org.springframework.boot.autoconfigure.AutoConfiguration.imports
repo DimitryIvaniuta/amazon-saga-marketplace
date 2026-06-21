@@ -1,0 +1,5 @@
+com.github.dimitryivaniuta.marketplace.common.configuration.CommonWebAutoConfiguration
+com.github.dimitryivaniuta.marketplace.common.messaging.MessagingConfiguration
+com.github.dimitryivaniuta.marketplace.common.messaging.KafkaReliabilityConfiguration
+
+com.github.dimitryivaniuta.marketplace.common.observability.LatencyMetricsAutoConfiguration

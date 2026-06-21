@@ -1,0 +1,30 @@
+plugins {
+    id 'java-library'
+    id 'io.spring.dependency-management'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+    }
+}
+
+dependencies {
+    api 'tools.jackson.core:jackson-databind'
+    api 'io.projectreactor:reactor-core'
+    api 'io.micrometer:micrometer-core'
+    api 'org.springframework:spring-webflux'
+    api 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'org.springframework.kafka:spring-kafka'
+    compileOnly 'org.springframework.data:spring-data-r2dbc'
+    api 'org.springframework.security:spring-security-oauth2-jose'
+    api 'org.springframework.security:spring-security-oauth2-resource-server'
+    api 'org.springframework.security:spring-security-web'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.springframework.kafka:spring-kafka'
+    testImplementation 'org.assertj:assertj-core'
+}
