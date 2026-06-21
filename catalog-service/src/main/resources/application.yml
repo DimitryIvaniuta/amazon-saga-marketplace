@@ -1,0 +1,41 @@
+server:
+  port: ${SERVER_PORT:8082}
+  shutdown: graceful
+spring:
+  application.name: catalog-service
+  lifecycle.timeout-per-shutdown-phase: 30s
+  r2dbc:
+    url: ${R2DBC_URL:r2dbc:postgresql://localhost:5432/catalog_db}
+    username: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+    pool:
+      initial-size: 2
+      max-size: 20
+      max-acquire-time: ${CATALOG_DB_ACQUIRE_TIMEOUT:750ms}
+  flyway:
+    url: ${FLYWAY_URL:jdbc:postgresql://localhost:5432/catalog_db}
+    user: ${DB_USERNAME:marketplace}
+    password: ${DB_PASSWORD:marketplace}
+  data.redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    timeout: ${CATALOG_REDIS_TIMEOUT:250ms}
+  security.oauth2.resourceserver.jwt.issuer-uri: ${JWT_ISSUER:http://localhost:8081}
+  security.oauth2.resourceserver.jwt.jwk-set-uri: ${AUTH_JWK_SET_URI:http://localhost:8081/oauth2/jwks}
+  security.oauth2.resourceserver.jwt.audiences[0]: ${JWT_AUDIENCE:marketplace-api}
+management:
+  endpoints.web.exposure.include: health,info,prometheus,metrics
+  endpoint.health.probes.enabled: true
+logging.structured.format.console: logstash
+marketplace:
+  catalog:
+    cache:
+      local-maximum-size: ${CATALOG_LOCAL_CACHE_MAX_SIZE:10000}
+      local-ttl: ${CATALOG_LOCAL_CACHE_TTL:20s}
+      redis-ttl: ${CATALOG_REDIS_CACHE_TTL:5m}
+      negative-ttl: ${CATALOG_NEGATIVE_CACHE_TTL:30s}
+      load-timeout: ${CATALOG_CACHE_LOAD_TIMEOUT:1s}
+      lock-ttl: ${CATALOG_CACHE_LOCK_TTL:5s}
+      lock-wait: ${CATALOG_CACHE_LOCK_WAIT:250ms}
+      poll-interval: ${CATALOG_CACHE_POLL_INTERVAL:20ms}
+      ttl-jitter-ratio: ${CATALOG_CACHE_TTL_JITTER:0.15}
