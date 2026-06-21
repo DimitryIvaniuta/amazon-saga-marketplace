@@ -9,7 +9,7 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -30,7 +30,7 @@ jobs:
       matrix:
         module: [api-gateway, auth-service, catalog-service, cart-service, inventory-service, order-service, payment-service, shipping-service, audit-service, external-payment-simulator]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
