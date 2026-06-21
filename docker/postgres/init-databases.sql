@@ -1,0 +1,9 @@
+CREATE DATABASE auth_db OWNER marketplace;
+CREATE DATABASE catalog_db OWNER marketplace;
+CREATE DATABASE cart_db OWNER marketplace;
+CREATE DATABASE inventory_db OWNER marketplace;
+CREATE DATABASE order_db OWNER marketplace;
+CREATE DATABASE payment_db OWNER marketplace;
+CREATE DATABASE shipping_db OWNER marketplace;
+CREATE DATABASE audit_db OWNER marketplace;
+CREATE DATABASE provider_db OWNER marketplace;

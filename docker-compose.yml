@@ -1,0 +1,332 @@
+name: amazon-saga-marketplace
+
+x-service-common: &service-common
+  restart: unless-stopped
+  networks: [marketplace]
+  depends_on:
+    postgres: { condition: service_healthy }
+    kafka-1: { condition: service_healthy }
+  environment: &common-environment
+    DB_USERNAME: marketplace
+    DB_PASSWORD: marketplace
+    KAFKA_BOOTSTRAP_SERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+    AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
+    JWT_ISSUER: http://localhost:8081
+    JWT_AUDIENCE: marketplace-api
+  stop_grace_period: 70s
+
+x-kafka-common: &kafka-common
+  image: apache/kafka:4.3.0
+  restart: unless-stopped
+  networks: [marketplace]
+  environment: &kafka-environment
+    KAFKA_PROCESS_ROLES: broker,controller
+    KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+    KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+    KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+    KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 3
+    KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 2
+    KAFKA_MIN_INSYNC_REPLICAS: 2
+    KAFKA_LOG_DIRS: /var/lib/kafka/data
+    KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+    KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 >/dev/null 2>&1"]
+    interval: 10s
+    timeout: 8s
+    retries: 20
+    start_period: 30s
+
+services:
+  postgres:
+    image: postgres:18.4
+    restart: unless-stopped
+    networks: [marketplace]
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: marketplace
+      POSTGRES_PASSWORD: marketplace
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketplace -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8.6.3-alpine
+    restart: unless-stopped
+    networks: [marketplace]
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes: ["redis-control-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-cache:
+    image: redis:8.6.3-alpine
+    restart: unless-stopped
+    networks: [marketplace]
+    ports: ["6380:6379"]
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lfu", "--lazyfree-lazy-eviction", "yes"]
+    volumes: ["redis-cache-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka-1:
+    <<: *kafka-common
+    ports: ["9092:9092"]
+    environment:
+      <<: *kafka-environment
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-1:29092,EXTERNAL://localhost:9092
+    volumes: ["kafka-1-data:/var/lib/kafka/data"]
+
+  kafka-2:
+    <<: *kafka-common
+    ports: ["9093:9092"]
+    environment:
+      <<: *kafka-environment
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-2:29092,EXTERNAL://localhost:9093
+    volumes: ["kafka-2-data:/var/lib/kafka/data"]
+
+  kafka-3:
+    <<: *kafka-common
+    ports: ["9094:9092"]
+    environment:
+      <<: *kafka-environment
+      KAFKA_NODE_ID: 3
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-3:29092,EXTERNAL://localhost:9094
+    volumes: ["kafka-3-data:/var/lib/kafka/data"]
+
+  kafka-init:
+    image: apache/kafka:4.3.0
+    networks: [marketplace]
+    depends_on:
+      kafka-1: { condition: service_healthy }
+      kafka-2: { condition: service_healthy }
+      kafka-3: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "/scripts/create-topics.sh"]
+    volumes:
+      - ./docker/kafka/create-topics.sh:/scripts/create-topics.sh:ro
+
+  auth-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: auth-service } }
+    ports: ["8081:8081"]
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/auth_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/auth_db
+      BOOTSTRAP_ADMIN_ENABLED: "true"
+      BOOTSTRAP_ADMIN_EMAIL: admin@example.com
+      BOOTSTRAP_ADMIN_PASSWORD: ChangeMe12345!
+
+  catalog-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: catalog-service } }
+    ports: ["8082:8082"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis-cache: { condition: service_healthy }
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/catalog_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/catalog_db
+      REDIS_HOST: redis-cache
+      CATALOG_DB_ACQUIRE_TIMEOUT: ${CATALOG_DB_ACQUIRE_TIMEOUT:-750ms}
+      CATALOG_REDIS_TIMEOUT: ${CATALOG_REDIS_TIMEOUT:-250ms}
+      CATALOG_LOCAL_CACHE_MAX_SIZE: ${CATALOG_LOCAL_CACHE_MAX_SIZE:-10000}
+      CATALOG_LOCAL_CACHE_TTL: ${CATALOG_LOCAL_CACHE_TTL:-20s}
+      CATALOG_REDIS_CACHE_TTL: ${CATALOG_REDIS_CACHE_TTL:-5m}
+      CATALOG_NEGATIVE_CACHE_TTL: ${CATALOG_NEGATIVE_CACHE_TTL:-30s}
+      CATALOG_CACHE_LOAD_TIMEOUT: ${CATALOG_CACHE_LOAD_TIMEOUT:-1s}
+      CATALOG_CACHE_LOCK_TTL: ${CATALOG_CACHE_LOCK_TTL:-5s}
+      CATALOG_CACHE_LOCK_WAIT: ${CATALOG_CACHE_LOCK_WAIT:-250ms}
+      CATALOG_CACHE_POLL_INTERVAL: ${CATALOG_CACHE_POLL_INTERVAL:-20ms}
+      CATALOG_CACHE_TTL_JITTER: ${CATALOG_CACHE_TTL_JITTER:-0.15}
+
+  cart-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: cart-service } }
+    ports: ["8083:8083"]
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/cart_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/cart_db
+
+  inventory-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: inventory-service } }
+    ports: ["8084:8084"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/inventory_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/inventory_db
+      INVENTORY_DB_ACQUIRE_TIMEOUT: ${INVENTORY_DB_ACQUIRE_TIMEOUT:-1s}
+      INVENTORY_KAFKA_CONCURRENCY: ${INVENTORY_KAFKA_CONCURRENCY:-6}
+
+  order-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: order-service } }
+    ports: ["8085:8085"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      cart-service: { condition: service_started }
+      catalog-service: { condition: service_started }
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/order_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/order_db
+      CART_SERVICE_URL: http://cart-service:8083
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+
+  external-payment-simulator:
+    restart: unless-stopped
+    networks: [marketplace]
+    build: { context: ., args: { MODULE: external-payment-simulator } }
+    ports: ["8090:8090"]
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/provider_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/provider_db
+      DB_USERNAME: marketplace
+      DB_PASSWORD: marketplace
+
+  payment-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: payment-service } }
+    ports: ["8086:8086"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      external-payment-simulator: { condition: service_started }
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/payment_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/payment_db
+      PAYMENT_PROVIDER_URL: http://external-payment-simulator:8090
+
+  shipping-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: shipping-service } }
+    ports: ["8087:8087"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/shipping_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/shipping_db
+
+  audit-service:
+    <<: *service-common
+    build: { context: ., args: { MODULE: audit-service } }
+    ports: ["8088:8088"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    environment:
+      <<: *common-environment
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/audit_db
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/audit_db
+
+  api-gateway:
+    restart: unless-stopped
+    networks: [marketplace]
+    build: { context: ., args: { MODULE: api-gateway } }
+    ports: ["8080:8080"]
+    stop_grace_period: 40s
+    depends_on:
+      redis: { condition: service_healthy }
+      auth-service: { condition: service_started }
+    environment:
+      REDIS_HOST: redis
+      AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
+      AUTH_SERVICE_URL: http://auth-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+      CART_SERVICE_URL: http://cart-service:8083
+      INVENTORY_SERVICE_URL: http://inventory-service:8084
+      ORDER_SERVICE_URL: http://order-service:8085
+      PAYMENT_SERVICE_URL: http://payment-service:8086
+      SHIPPING_SERVICE_URL: http://shipping-service:8087
+      AUDIT_SERVICE_URL: http://audit-service:8088
+      GATEWAY_CONNECT_TIMEOUT_MS: ${GATEWAY_CONNECT_TIMEOUT_MS:-1000}
+      GATEWAY_RESPONSE_TIMEOUT: ${GATEWAY_RESPONSE_TIMEOUT:-5s}
+      GATEWAY_MAX_CONNECTIONS: ${GATEWAY_MAX_CONNECTIONS:-500}
+      GATEWAY_POOL_ACQUIRE_TIMEOUT_MS: ${GATEWAY_POOL_ACQUIRE_TIMEOUT_MS:-1000}
+      GATEWAY_REDIS_TIMEOUT: ${GATEWAY_REDIS_TIMEOUT:-250ms}
+      CATALOG_CONNECT_TIMEOUT_MS: ${CATALOG_CONNECT_TIMEOUT_MS:-500}
+      CATALOG_RESPONSE_TIMEOUT_MS: ${CATALOG_RESPONSE_TIMEOUT_MS:-1500}
+      CATALOG_ROUTE_RATE: ${CATALOG_ROUTE_RATE:-5000}
+      CATALOG_ROUTE_BURST: ${CATALOG_ROUTE_BURST:-10000}
+      CATALOG_HOT_KEY_RATE: ${CATALOG_HOT_KEY_RATE:-500}
+      CATALOG_HOT_KEY_BURST: ${CATALOG_HOT_KEY_BURST:-1000}
+
+  prometheus:
+    image: prom/prometheus:v3.12.0
+    restart: unless-stopped
+    profiles: [observability]
+    networks: [marketplace]
+    ports: ["9090:9090"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana-oss:13.0.2
+    restart: unless-stopped
+    profiles: [observability]
+    networks: [marketplace]
+    ports: ["3000:3000"]
+    depends_on:
+      prometheus: { condition: service_started }
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+networks:
+  marketplace: { driver: bridge }
+volumes:
+  postgres-data:
+  redis-control-data:
+  redis-cache-data:
+  kafka-1-data:
+  kafka-2-data:
+  kafka-3-data:
+  prometheus-data:
+  grafana-data:
