@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'amazon-saga-marketplace'
+
+include 'common-platform'
+include 'api-gateway'
+include 'auth-service'
+include 'catalog-service'
+include 'cart-service'
+include 'inventory-service'
+include 'order-service'
+include 'payment-service'
+include 'shipping-service'
+include 'audit-service'
+include 'external-payment-simulator'

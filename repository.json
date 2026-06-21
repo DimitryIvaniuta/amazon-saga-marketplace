@@ -1,0 +1,20 @@
+{
+  "name": "amazon-saga-marketplace",
+  "description": "Production-oriented reactive marketplace with Saga checkout, p95/p99 observability, hot-product caching, striped inventory reservations, idempotent payments, compensation, and reconciliation.",
+  "topics": [
+    "java-25",
+    "spring-boot-4",
+    "webflux",
+    "r2dbc",
+    "kafka-kraft",
+    "postgresql",
+    "redis",
+    "saga-pattern",
+    "transactional-outbox",
+    "microservices",
+    "prometheus",
+    "grafana",
+    "p99-latency",
+    "hot-key-protection"
+  ]
+}
