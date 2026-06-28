@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 ARG MODULE
-FROM gradle:9.5.1-jdk25 AS build
+FROM gradle:9.6.0-jdk25 AS build
 ARG MODULE
 WORKDIR /workspace
 COPY --chown=gradle:gradle . .
